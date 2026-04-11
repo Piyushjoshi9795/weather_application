@@ -12,3 +12,5 @@ const connectDB= async ()=>{
         process.exit(1); // stop the server if DB fails — no point running without it
     }
 }
+
+module.exports=connectDB;
