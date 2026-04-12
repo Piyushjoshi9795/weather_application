@@ -67,3 +67,7 @@ const getWeather = async (req, res) => {
 };
 
 module.exports = { getWeather };
+
+// The cache flow explained:
+//  First request for "London" → Redis has nothing → call OpenWeatherMap → store result in Redis for 10 min → return data. 
+// Second request for "London" within 10 min → Redis returns instantly → no API call → faster response + fewer API credits used.

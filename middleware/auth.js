@@ -29,3 +29,8 @@ const protect = (req, res, next) => {
 };
 
 module.exports = { protect };
+
+// How JWT works: 
+// A JWT has 3 parts — Header (algorithm), Payload (your data like userId), Signature (proof it wasn't tampered with). 
+// When you verify, the server re-computes the signature and compares. 
+// If anyone changed the payload, the signature won't match → rejected.

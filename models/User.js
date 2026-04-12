@@ -31,15 +31,10 @@ const userSchema = new mongoose.Schema({
 
 // BEFORE saving to DB, hash the password
 // This is a Mongoose "pre-save hook"
-userSchema.pre('save',async function(next){
-     // only hash if password changed
-     // (otherwise we'd hash the already-hashed password on every save)
-    if(!this.isModified('password')) return next(); 
+userSchema.pre('save', async function () {
+  if (!this.isModified('password')) return;
 
-  // bcrypt salt rounds = 10 means: apply the hashing algorithm 2^10 = 1024 times
-  // Higher = slower to crack, but also slower to compute. 10 is the industry standard.
   this.password = await bcrypt.hash(this.password, 10);
-  next();
 });
 
 // Method to compare entered password with hashed password in DB
