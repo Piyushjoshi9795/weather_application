@@ -1,6 +1,7 @@
 // controllers/authController.js
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const { publishEvent } = require('../config/kafka');
 
 // Helper: generate short-lived access token (15 min)
 const generateAccessToken = (user) => {
@@ -12,7 +13,8 @@ const generateAccessToken = (user) => {
 };
 
 // Helper: generate long-lived refresh token (7 days)
-const generateRefreshToken = (user) => {
+const generateRefreshToken = (user) => { // how new refresh tokens are generated. This function takes a user object and creates a JWT that contains the user's ID. The token is signed with a secret key and set to expire in 7 days. This refresh token is stored in the database and sent to the client in an HttpOnly cookie. When the client needs a new access token, it sends this refresh token back to the server for verification. If valid, the server issues a new access token and a new refresh token (rotation), and the old refresh token is deleted from the database to prevent reuse.
+  // if it is using userid then how everytime new token is generated? because the payload is the same, so the signature will be the same, so how does it generate a new token? The token will be different every time because of the "iat" (issued at) timestamp that JWT automatically adds to the payload. Even if the userId is the same, the iat will be different for each token generated, resulting in a different signature. So every time you call generateRefreshToken, it creates a new token with a new iat, making it unique.
   return jwt.sign(
     { userId: user._id },
     process.env.REFRESH_TOKEN_SECRET,
@@ -32,7 +34,13 @@ const register = async (req, res) => {
     }
 
     // Create user — password gets hashed automatically by the pre-save hook
-    const user = await User.create({ username, email, password });
+    const user = await User.create({ username, email, password }); // why we don't save after this? because .create() does both "new User()" and "save()" in one step
+    // Publish event to Kafka — consumer will send welcome email
+    // We do NOT await this — fire and forget, don't block the response
+    publishEvent('user.registered', {
+      email: user.email,
+       username: user.username
+    }).catch(err => console.error('Kafka publish failed:', err));
 
     res.status(201).json({ message: 'Account created successfully.' });
   } catch (error) {
@@ -51,7 +59,7 @@ const login = async (req, res) => {
       return res.status(401).json({ message: 'Invalid credentials.' });
     }
 
-    const isMatch = await user.comparePassword(password);
+    const isMatch = await user.comparePassword(password); // this calls the method we defined in User model to compare hashed password
     if (!isMatch) {
       return res.status(401).json({ message: 'Invalid credentials.' });
     }
@@ -60,8 +68,15 @@ const login = async (req, res) => {
     const accessToken = generateAccessToken(user);
     const refreshToken = generateRefreshToken(user);
 
+    // Publish login alert event
+    publishEvent('user.loggedin', {
+      email: user.email,
+      username: user.username,
+      timestamp: new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })
+    }).catch(err => console.error('Kafka publish failed:', err));
+
     // Save refresh token in DB (so we can revoke it on logout)
-    user.refreshTokens.push(refreshToken);
+    user.refreshTokens.push(refreshToken); 
     await user.save();
 
     // Send refresh token in an HttpOnly cookie
@@ -85,7 +100,7 @@ const login = async (req, res) => {
 
 // ─── REFRESH TOKEN ────────────────────────────────────────
 // Called automatically when access token expires
-const refreshToken = async (req, res) => {
+const refreshToken = async (req, res) => { // explain this function in detail. This is the heart of the refresh token flow. When the frontend gets a 403 (forbidden) response, it calls this endpoint to get a new access token. The refresh token is sent automatically in the HttpOnly cookie. The server verifies it, checks if it's still valid (not revoked), and if everything checks out, it issues a new access token and a new refresh token (rotation). The old refresh token is deleted from the database, so if someone stole it, they can only use it once before it becomes useless.
   try {
     // Read refresh token from HttpOnly cookie
     const token = req.cookies.refreshToken;
@@ -101,7 +116,7 @@ const refreshToken = async (req, res) => {
       return res.status(403).json({ message: 'Invalid refresh token.' });
     }
 
-    // Check if this token exists in DB (it might have been revoked on logout)
+    // Check if this token exists in DB (it might have been revoked on logout) 
     const user = await User.findById(decoded.userId);
     if (!user || !user.refreshTokens.includes(token)) {
       return res.status(403).json({ message: 'Refresh token revoked.' });
@@ -109,7 +124,7 @@ const refreshToken = async (req, res) => {
 
     // ROTATION: Delete old refresh token, issue a new one
     // This means if a refresh token is stolen, using it once invalidates it
-    user.refreshTokens = user.refreshTokens.filter(t => t !== token);
+    user.refreshTokens = user.refreshTokens.filter(t => t !== token); // remove the old token
     const newRefreshToken = generateRefreshToken(user);
     user.refreshTokens.push(newRefreshToken);
     await user.save();

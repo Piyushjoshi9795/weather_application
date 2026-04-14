@@ -1,36 +1,54 @@
 // server.js
-require('dotenv').config(); // must be first — loads .env variables
+require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const cookieParser = require('cookie-parser');
 const connectDB = require('./config/db');
+const { connectProducer } = require('./config/kafka');
+const { startConsumer } = require('./services/kafkaConsumer');
+const { startCronJobs } = require('./services/cronJobs');
 
-// Import routes
 const authRoutes = require('./routes/authRoutes');
 const weatherRoutes = require('./routes/weatherRoutes');
 
 const app = express();
 
-// Connect to MongoDB
+// Connect everything
 connectDB();
 
-// ── Middleware (runs on every request) ───────────────────
-app.use(cors({
-  origin: 'http://localhost:3000', // only allow your React app
-  credentials: true                // allow cookies to be sent/received
-}));
-app.use(express.json());       // parse JSON request bodies
-app.use(cookieParser());       // parse cookies
+// Start Kafka producer, consumer, and cron jobs
+// These are async but we don't await them at top level —
+// they run in the background while the server starts
+connectProducer().catch(console.error);
+startConsumer().catch(console.error);
+startCronJobs();
 
-// ── Routes ───────────────────────────────────────────────
+app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
+app.use(express.json());
+app.use(cookieParser());
+
 app.use('/api/auth', authRoutes);
 app.use('/api/weather', weatherRoutes);
 
-// ── Global error handler ─────────────────────────────────
+// New route — save user's city for daily digest
+app.post('/api/user/city', require('./middleware/auth').protect, async (req, res) => {
+  try {
+    const { city } = req.body;
+    await require('./models/User').findByIdAndUpdate(
+      req.user.userId,
+      { savedCity: city },
+      { new: true }
+    );
+    res.json({ message: `Daily digest set for ${city}` });
+  } catch (err) {
+    res.status(500).json({ message: 'Failed to save city' });
+  }
+});
+
 app.use((err, req, res, next) => {
   console.error(err.stack);
-  res.status(500).json({ message: 'Something went wrong on the server.' });
+  res.status(500).json({ message: 'Something went wrong.' });
 });
 
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));

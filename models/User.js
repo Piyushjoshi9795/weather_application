@@ -17,12 +17,21 @@ const userSchema = new mongoose.Schema({
         lowercase: true, // always store emails in lowercase
         trim: true,   
     },
+    savedCity: {
+        type: String,
+        default: null        // user can save one city for daily digest
+},
+    digestEnabled: {
+        type: Boolean,
+        default: true        // opt-in to daily weather email by default
+    },
     password: {
         type: String,
         required: true,
         minlength: 6,
 
     },
+    
    // Store refresh tokens here so we can revoke them
   // (a user can be logged in on multiple devices)
   refreshTokens: [String]

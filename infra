@@ -29,3 +29,31 @@ weather-app/
             ├── Login.jsx
             ├── Register.jsx
             └── Weather.jsx
+
+1. User registers → password hashed by bcrypt → saved to MongoDB
+
+2. User logs in →
+   - Server creates access token (15 min, returned in response body)
+   - Server creates refresh token (7 days, sent as HttpOnly cookie)
+   - Frontend stores access token in localStorage
+
+3. User searches "London" →
+   - Axios interceptor adds: Authorization: Bearer <accessToken>
+   - Backend auth middleware verifies JWT signature
+   - Rate limiter checks: has this IP made 100 requests in 15 min?
+   - Weather controller checks Redis: is "weather:london" cached?
+   - Cache MISS → calls OpenWeatherMap → stores in Redis 10 min
+   - Returns weather data
+
+4. 15 minutes later, access token expires →
+   - Next API call gets 403
+   - Axios response interceptor catches it automatically
+   - Silently calls /api/auth/refresh
+   - Browser sends HttpOnly refresh token cookie automatically
+   - Server validates, rotates refresh token, returns new access token
+   - Original request is retried — user never notices
+
+5. User logs out →
+   - Refresh token deleted from MongoDB
+   - Cookie cleared
+   - Access token removed from localStorage
