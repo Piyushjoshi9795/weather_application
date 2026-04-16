@@ -19,8 +19,13 @@ connectDB();
 // Start Kafka producer, consumer, and cron jobs
 // These are async but we don't await them at top level —
 // they run in the background while the server starts
-connectProducer().catch(console.error);
-startConsumer().catch(console.error);
+// If Kafka is unavailable, app continues running but won't process async events
+connectProducer()
+  .catch(err => console.warn('⚠️  Kafka producer unavailable:', err.message));
+
+startConsumer()
+  .catch(err => console.warn('⚠️  Kafka consumer unavailable:', err.message));
+
 startCronJobs();
 
 app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
