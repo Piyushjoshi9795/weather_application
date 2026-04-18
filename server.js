@@ -32,6 +32,11 @@ app.use(cors({ origin: 'http://localhost:3000', credentials: true }));
 app.use(express.json());
 app.use(cookieParser());
 
+// Add this before your other routes in server.js
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+}); // This is a simple health check endpoint. It responds with a 200 status and a JSON object containing the status and current timestamp. This can be used by monitoring tools or load balancers to check if the server is up and running.
+
 app.use('/api/auth', authRoutes);
 app.use('/api/weather', weatherRoutes);
 
