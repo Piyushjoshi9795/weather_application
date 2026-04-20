@@ -9,7 +9,7 @@ const getWeather = async (req, res) => {
     return res.status(400).json({ message: 'City name is required.' });
   }
 
-  const cacheKey = `weather:${city.toLowerCase()}`;
+  const cacheKey = `weather:${city.toLowerCase()}`; // 
 
   try {
     // ── Step 1: Check Redis cache first ──────────────────
@@ -17,7 +17,7 @@ const getWeather = async (req, res) => {
     if (cachedData) {
       console.log(`Cache HIT for: ${city}`);
       // Return cached data immediately — no API call needed
-      return res.json({ source: 'cache', data: JSON.parse(cachedData) });
+      return res.json({ source: 'cache', data: JSON.parse(cachedData) }); 
     }
 
     console.log(`Cache MISS for: ${city} — fetching from API`);
@@ -49,7 +49,7 @@ const getWeather = async (req, res) => {
 
     // ── Step 3: Store in Redis for 10 minutes ─────────────
     // 'EX 600' means: expire this key after 600 seconds
-    await redisClient.set(cacheKey, JSON.stringify(weatherData), { EX: 600 });
+    await redisClient.set(cacheKey, JSON.stringify(weatherData), { EX: 600 }); // 
 
     res.json({ source: 'api', data: weatherData });
 
