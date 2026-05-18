@@ -57,3 +57,113 @@ weather-app/
    - Refresh token deleted from MongoDB
    - Cookie cleared
    - Access token removed from localStorage
+
+
+   # Step 1 — install WSL
+wsl --install
+
+# Restart your PC, then open the Ubuntu app that appears
+# Inside Ubuntu terminal:
+sudo apt update
+sudo apt install redis-server -y
+sudo service redis-server start
+
+# Test
+redis-cli ping
+# PONG ✓
+
+
+
+# Terminal 2 — start Redis
+redis-server (run this using ubuntu cli and type sudo service redis-server start)
+
+# Terminal 3 — start backend
+cd backend && node server.js
+
+# Terminal 4 — start frontend
+cd frontend && npm start
+
+// How everything flowssss
+USER REGISTERS
+─────────────
+React → POST /api/auth/register
+  → MongoDB saves user (password hashed)
+  → publishEvent('user.registered', { email, username })  ← fire & forget
+  → Returns 201 immediately  ← user doesn't wait for email
+
+  [Background — Kafka Consumer]
+  → Picks up 'user.registered' event
+  → Nodemailer sends welcome email to user's Gmail
+
+
+USER LOGS IN
+────────────
+React → POST /api/auth/login
+  → Verifies password with bcrypt
+  → Creates access token (15 min) + refresh token (7 days)
+  → publishEvent('user.loggedin', { email, username, timestamp })
+  → Returns tokens immediately
+
+  [Background — Kafka Consumer]
+  → Picks up 'user.loggedin' event
+  → Nodemailer sends login alert email
+
+
+USER TYPES "London" IN SEARCH BOX
+──────────────────────────────────
+L → debounce timer resets
+Lo → debounce timer resets
+Lon → debounce timer resets
+Lond → debounce timer resets
+Londo → debounce timer resets
+London → [500ms of silence] → fires ONE API call ✓
+
+
+EVERY DAY AT 8AM (Cron)
+────────────────────────
+→ Finds all users with savedCity + digestEnabled
+→ Fetches fresh weather from OpenWeatherMap for each
+→ publishEvent('weather.digest', { email, city, weatherData })
+→ Kafka consumer sends personalized weather email to each user
+
+
+EVERY MIDNIGHT (Cron)
+──────────────────────
+→ Scans all users' refreshTokens arrays in MongoDB
+→ Verifies each token — removes expired ones
+→ Keeps DB clean
+
+
+EVERY 9 MINUTES (Cron)
+───────────────────────
+→ Pre-fetches Delhi, Mumbai, London, New York, Tokyo, Paris
+→ Stores each in Redis (10 min TTL)
+→ Users searching these cities always get instant cache hits
+
+
+------------------Docker ,K8, AWS----------------------
+Without Docker, you say "it works on my machine" — Docker makes it work EVERYWHERE the same way.
+Without Kubernetes, if your app crashes at 3AM, nobody restarts it. K8s does that automatically.
+Without AWS, your app dies when you close your laptop. AWS keeps it running 24/7.The full roadmapPhase 1 — Docker
+  └── Containerize backend, frontend, MongoDB, Redis, Kafka
+  └── Wire them together with docker-compose (local)
+
+Phase 2 — Kubernetes  
+  └── Write K8s configs (Deployments, Services, ConfigMaps, Secrets)
+  └── Test locally with minikube
+
+Phase 3 — AWS
+  └── Push images to ECR (AWS's Docker Hub)
+  └── Create EKS cluster (AWS's managed Kubernetes)
+  └── Deploy everything to the cloud
+
+  
+  Your laptop (Windows)
+  └── Docker Container
+        ├── Ubuntu Linux (inside the container)
+        ├── Node.js 20
+        ├── Your backend code
+        └── All npm packages
+
+AWS Server (also Linux)
+  └── Same Docker Container  ← identical, guaranteed

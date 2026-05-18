@@ -7,7 +7,7 @@ const protect = (req, res, next) => {
   // JWT is sent in the Authorization header like:
   // Authorization: Bearer eyJhbGciOiJIUzI1NiJ9...
   const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // get just the token part
+  const token = authHeader && authHeader.split(' ')[1]; // get just the token part after "Bearer"
 
   if (!token) {
     return res.status(401).json({ message: 'No token provided. Access denied.' });
@@ -17,7 +17,7 @@ const protect = (req, res, next) => {
     // jwt.verify() does two things:
     // 1. Checks the signature (was this token really made by us?)
     // 2. Checks expiry (has it expired?)
-    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET);
+    const decoded = jwt.verify(token, process.env.ACCESS_TOKEN_SECRET); 
 
     // Attach user info to the request so route handlers can use it
     req.user = decoded; // { userId, username, iat, exp }

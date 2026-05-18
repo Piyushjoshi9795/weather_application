@@ -37,3 +37,9 @@ const publishEvent = async (topic, message) => {
 };
 
 module.exports = { kafka, producer, consumer, connectProducer, publishEvent };
+
+// What is a Kafka topic?
+//  Think of it like a YouTube channel. 
+// Producers publish videos (messages) to a channel (topic). 
+// Multiple subscribers (consumers) can watch (consume) those videos independently. 
+// Topics are persistent — messages stay for 7 days by default even after being consumed.
